@@ -798,7 +798,7 @@ pub(super) mod typed {
     use crate::{
         compositor,
         job::Callback,
-        ui::{self, overlay::overlaid},
+        ui::{self, overlay::overlaid, picker::PickerCallbackResult},
     };
     use ::command_line::Args;
     use anyhow::anyhow;
@@ -899,41 +899,44 @@ pub(super) mod typed {
         Ok(())
     }
 
-    #[cold]
-    pub(in crate::commands) fn lsp_running_commands(
-        cx: &mut compositor::Context,
-        _args: Args,
-    ) -> anyhow::Result<()> {
-        let running = cx.editor.running_lsp_commands();
-        if running.is_empty() {
-            cx.editor.set_status("No running language server commands");
-            return Ok(());
-        }
-        let servers: std::collections::HashMap<_, _> = running
+    type RunningCommand = view::features::lsp_commands::RunningLspCommand;
+    type ServerNames = std::collections::HashMap<lsp_client::LanguageServerId, String>;
+
+    fn running_command_rows(editor: &view::Editor) -> (Vec<RunningCommand>, ServerNames) {
+        let running = editor.running_lsp_commands();
+        let servers = running
             .iter()
             .map(|command| {
-                let name = cx
-                    .editor
+                let name = editor
                     .language_server_by_id(command.server_id)
                     .map_or_else(String::new, |server| server.name().to_owned());
                 (command.server_id, name)
             })
             .collect();
+        (running, servers)
+    }
+
+    #[cold]
+    pub(in crate::commands) fn lsp_running_commands(
+        cx: &mut compositor::Context,
+        _args: Args,
+    ) -> anyhow::Result<()> {
+        let (running, servers) = running_command_rows(cx.editor);
+        if running.is_empty() {
+            cx.editor.set_status("No running language server commands");
+            return Ok(());
+        }
         cx.jobs
             .sender()
             .enqueue(Callback::ui(move |compositor, cx| {
                 let editor = &mut *cx.editor;
                 let columns = [
-                    ui::PickerColumn::new(
-                        "title",
-                        |command: &view::features::lsp_commands::RunningLspCommand, _| {
-                            command.title.as_str().into()
-                        },
-                    ),
+                    ui::PickerColumn::new("title", |command: &RunningCommand, _| {
+                        command.title.as_str().into()
+                    }),
                     ui::PickerColumn::new(
                         "server",
-                        |command: &view::features::lsp_commands::RunningLspCommand,
-                         servers: &std::collections::HashMap<_, String>| {
+                        |command: &RunningCommand, servers: &ServerNames| {
                             servers
                                 .get(&command.server_id)
                                 .cloned()
@@ -941,14 +944,12 @@ pub(super) mod typed {
                                 .into()
                         },
                     ),
-                    ui::PickerColumn::new(
-                        "running",
-                        |command: &view::features::lsp_commands::RunningLspCommand, _| {
-                            format!("{}s", command.started.elapsed().as_secs()).into()
-                        },
-                    ),
+                    ui::PickerColumn::new("running", |command: &RunningCommand, _| {
+                        format!("{}s", command.started.elapsed().as_secs()).into()
+                    }),
                 ];
-                let picker = ui::Picker::new(
+                // Stay open after cancelling so several commands can be stopped in a row.
+                let picker = ui::Picker::new_with_callback_result(
                     editor.redraw().clone(),
                     columns,
                     0,
@@ -960,6 +961,14 @@ pub(super) mod typed {
                                 .set_status(format!("Cancelled \"{}\"", command.title));
                         } else {
                             cx.editor.set_status("Command already finished");
+                        }
+                        let (options, editor_data) = running_command_rows(cx.editor);
+                        if options.is_empty() {
+                            return PickerCallbackResult::Close;
+                        }
+                        PickerCallbackResult::Refresh {
+                            options,
+                            editor_data,
                         }
                     },
                 );

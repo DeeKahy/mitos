@@ -9,6 +9,9 @@ use serde::Deserialize;
 use serde_json::Value;
 use std::{collections::HashMap, future::Future};
 
+/// Effectively unbounded: a day, large enough to never fire before the user cancels.
+const COMMAND_TIMEOUT_SECS: u64 = 24 * 60 * 60;
+
 impl Client {
     /// Merge FormattingOptions with 'config.format' and return it
     fn get_merged_formatting_options(
@@ -730,6 +733,12 @@ impl Client {
             },
         };
 
-        Some(self.call::<lsp::request::ExecuteCommand>(params))
+        // Commands may legitimately run for a long time (e.g. evaluating code). They are
+        // listed and cancellable by the user, so the regular request timeout would only
+        // hide a server that is still working.
+        Some(self.call_with_timeout::<lsp::request::ExecuteCommand>(
+            &params,
+            COMMAND_TIMEOUT_SECS,
+        ))
     }
 }

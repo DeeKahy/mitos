@@ -80,15 +80,17 @@ impl RunningLspCommands {
             .collect()
     }
 
+    /// Remove the entry now rather than when the aborted task is dropped, so a
+    /// listing taken right after cancelling no longer shows it.
     fn cancel(&self, id: u64) -> bool {
-        let handle = self
-            .0
-            .lock()
-            .entries
-            .iter()
-            .find(|(c, _)| c.id == id)
-            .map(|(_, handle)| handle.clone());
-        handle.map(|handle| handle.abort()).is_some()
+        let mut state = self.0.lock();
+        let Some(position) = state.entries.iter().position(|(c, _)| c.id == id) else {
+            return false;
+        };
+        let (_, handle) = state.entries.remove(position);
+        drop(state);
+        handle.abort();
+        true
     }
 }
 
@@ -149,9 +151,11 @@ mod tests {
         assert_eq!(running.title, "eval");
 
         assert!(commands.cancel(running.id));
+        assert!(
+            commands.list().is_empty(),
+            "removed without waiting for the task"
+        );
         assert!(dropped_rx.await.is_err(), "future was dropped");
-        settle().await;
-        assert!(commands.list().is_empty());
         assert!(!commands.cancel(running.id));
     }
 
