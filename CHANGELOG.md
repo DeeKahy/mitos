@@ -4,6 +4,53 @@
 
 ## [Unreleased]
 
+## [0.2.2](https://github.com/mitos-editor/mitos/compare/v0.2.1...v0.2.2) - 2026-11-11
+
+### Added
+
+- *(vcs)* add worktree locking and batch watch refreshes ([#1004](https://github.com/mitos-editor/mitos/pull/1004))
+- *(theme)* unify highlight scopes and semantic styling ([#1034](https://github.com/mitos-editor/mitos/pull/1034))
+- *(search)* highlight buffer search matches ([#1028](https://github.com/mitos-editor/mitos/pull/1028))
+- *(windows)* share resize mode with the file sidebar ([#1027](https://github.com/mitos-editor/mitos/pull/1027))
+- *(picker)* load large collections incrementally ([#1006](https://github.com/mitos-editor/mitos/pull/1006))
+- *(languages)* add Structurizr DSL support ([#1036](https://github.com/mitos-editor/mitos/pull/1036))
+
+### Fixed
+
+- *(vcs)* share syntax highlighting in changed-file previews ([#1041](https://github.com/mitos-editor/mitos/pull/1041))
+- *(statusline)* preserve file identity in narrow views ([#1033](https://github.com/mitos-editor/mitos/pull/1033))
+- preserve syntax colors for document links ([#1030](https://github.com/mitos-editor/mitos/pull/1030))
+
+### Other
+
+- Share command context and callback adapters ([#1064](https://github.com/mitos-editor/mitos/pull/1064))
+- *(view)* separate completion previews from live documents ([#1065](https://github.com/mitos-editor/mitos/pull/1065))
+- *(term)* share deferred input capture and replay ([#1068](https://github.com/mitos-editor/mitos/pull/1068))
+- consolidate closest pair selection cases ([#1069](https://github.com/mitos-editor/mitos/pull/1069))
+- *(term)* centralize explorer index loading ([#1059](https://github.com/mitos-editor/mitos/pull/1059))
+- *(term)* enqueue ready UI callbacks directly ([#1062](https://github.com/mitos-editor/mitos/pull/1062))
+- Move structural selection and join matrices to owners ([#1063](https://github.com/mitos-editor/mitos/pull/1063))
+- *(picker)* centralize query scheduling and replacement staging ([#1055](https://github.com/mitos-editor/mitos/pull/1055))
+- *(term)* separate picker preview preparation from cached reads ([#1056](https://github.com/mitos-editor/mitos/pull/1056))
+- Consolidate selection reordering tests ([#1057](https://github.com/mitos-editor/mitos/pull/1057))
+- remove unused APIs and finish workspace migration ([#1051](https://github.com/mitos-editor/mitos/pull/1051))
+- consolidate behavior coverage and shared fixtures ([#1052](https://github.com/mitos-editor/mitos/pull/1052))
+- *(view)* consolidate feature ownership and provider selection ([#1054](https://github.com/mitos-editor/mitos/pull/1054))
+- *(ui)* share text rendering and keymap subtrees ([#1053](https://github.com/mitos-editor/mitos/pull/1053))
+- *(render)* skip invisible tails of unwrapped lines ([#1047](https://github.com/mitos-editor/mitos/pull/1047))
+- Resume suspended picker queries before accepting input
+- gate Git-only picker helpers with their feature
+- move sidebar query matching and row preparation to workers
+- Suspend Git picker workers while retaining resumable presentation
+- *(term)* make runtime grammar tests opt-in ([#1011](https://github.com/mitos-editor/mitos/pull/1011))
+- *(syntax)* add update attribution and repeatable profiling workloads ([#1046](https://github.com/mitos-editor/mitos/pull/1046))
+- recognize `.bazelrc` files ([#1072](https://github.com/mitos-editor/mitos/pull/1072))
+- Fix branch pagination retry after worker failure ([#1042](https://github.com/mitos-editor/mitos/pull/1042))
+- Avoid full tree diffs for ordinary file history edits ([#1043](https://github.com/mitos-editor/mitos/pull/1043))
+- bind document hook scheduling to editor services ([#1067](https://github.com/mitos-editor/mitos/pull/1067))
+- *(view)* bind document hooks to editor services ([#1058](https://github.com/mitos-editor/mitos/pull/1058))
+- *(view)* make document origin authoritative ([#1044](https://github.com/mitos-editor/mitos/pull/1044))
+
 ## [0.2.1](https://github.com/mitos-editor/mitos/compare/v0.2.0...v0.2.1) - 2026-11-09
 
 - Fix release packaging on Windows: omit upstream grammar symlinks that prevented both Windows builds from extracting their sources. The failure also blocked publication of all 0.2.0 downloads; this release includes the [0.2.0 features and upgrade notes](https://github.com/mitos-editor/mitos/blob/v0.2.0/CHANGELOG.md#020---2026-11-08) below.
