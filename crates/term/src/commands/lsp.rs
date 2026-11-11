@@ -900,6 +900,77 @@ pub(super) mod typed {
     }
 
     #[cold]
+    pub(in crate::commands) fn lsp_running_commands(
+        cx: &mut compositor::Context,
+        _args: Args,
+    ) -> anyhow::Result<()> {
+        let running = cx.editor.running_lsp_commands();
+        if running.is_empty() {
+            cx.editor.set_status("No running language server commands");
+            return Ok(());
+        }
+        let servers: std::collections::HashMap<_, _> = running
+            .iter()
+            .map(|command| {
+                let name = cx
+                    .editor
+                    .language_server_by_id(command.server_id)
+                    .map_or_else(String::new, |server| server.name().to_owned());
+                (command.server_id, name)
+            })
+            .collect();
+        cx.jobs
+            .sender()
+            .enqueue(Callback::ui(move |compositor, cx| {
+                let editor = &mut *cx.editor;
+                let columns = [
+                    ui::PickerColumn::new(
+                        "title",
+                        |command: &view::features::lsp_commands::RunningLspCommand, _| {
+                            command.title.as_str().into()
+                        },
+                    ),
+                    ui::PickerColumn::new(
+                        "server",
+                        |command: &view::features::lsp_commands::RunningLspCommand,
+                         servers: &std::collections::HashMap<_, String>| {
+                            servers
+                                .get(&command.server_id)
+                                .cloned()
+                                .unwrap_or_default()
+                                .into()
+                        },
+                    ),
+                    ui::PickerColumn::new(
+                        "running",
+                        |command: &view::features::lsp_commands::RunningLspCommand, _| {
+                            format!("{}s", command.started.elapsed().as_secs()).into()
+                        },
+                    ),
+                ];
+                let picker = ui::Picker::new(
+                    editor.redraw().clone(),
+                    columns,
+                    0,
+                    running,
+                    servers,
+                    move |cx, command, _action| {
+                        if cx.editor.cancel_lsp_command(command.id) {
+                            cx.editor
+                                .set_status(format!("Cancelled \"{}\"", command.title));
+                        } else {
+                            cx.editor.set_status("Command already finished");
+                        }
+                    },
+                );
+                compositor.push(Box::new(overlaid(
+                    picker.with_title("Running LSP Commands"),
+                )))
+            }));
+        Ok(())
+    }
+
+    #[cold]
     pub(in crate::commands) fn lsp_restart(
         cx: &mut compositor::Context,
         args: Args,

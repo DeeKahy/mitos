@@ -59,6 +59,7 @@
 | `:reload-all`, `:rla` | Reload saved buffers, preserving documents with unsaved changes. |
 | `:update`, `:u` | Write changes only if the file has been modified. |
 | `:lsp-workspace-command` | Open workspace command picker |
+| `:lsp-running-commands`, `:lsp-running` | Open a picker of running language server commands; selecting one cancels it |
 | `:lsp-restart` | Restarts the given language servers, or all language servers that are used by the current file if no arguments are supplied |
 | `:lsp-stop` | Stops the given language servers, or all language servers that are used by the current file if no arguments are supplied |
 | `:tree-sitter-scopes` | Display tree sitter scopes, primarily for theming and development. |

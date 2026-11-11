@@ -984,6 +984,13 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         args: CommandArgs::new(&[], &[completers::lsp_workspace_command]).rest(completers::none).raw_after(1),
     },
     TypableCommand {
+        name: "lsp-running-commands",
+        aliases: &["lsp-running"],
+        doc: "Open a picker of running language server evaluators where you can cancel them",
+        action: CommandAction::Committed(super::lsp::typed::lsp_running_commands),
+        args: CommandArgs::new(&[], &[]),
+    },
+    TypableCommand {
         name: "lsp-restart",
         aliases: &[],
         doc: "Restarts the given language servers, or all language servers that are used by the current file if no arguments are supplied",

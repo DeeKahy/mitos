@@ -104,7 +104,9 @@ or set `enable = false` under `[editor.lsp]` to disable language servers.
 To choose a server or change its settings, edit
 [`languages.toml`](./languages.md#language-server-configuration).
 Use `:lsp-restart` afterwards. `:lsp-stop` stops servers for the current file;
-`:lsp-workspace-command` runs a command provided by the server.
+`:lsp-workspace-command` runs a command provided by the server, and
+`:lsp-running-commands` lists commands still executing (such as a code lens
+evaluation) so you can cancel one without restarting the server.
 
 If a feature is missing, start with the
 [troubleshooting guide](./troubleshooting.md#language-features-are-missing).
