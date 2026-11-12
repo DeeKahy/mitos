@@ -902,18 +902,41 @@ pub(super) mod typed {
     type RunningCommand = view::features::lsp_commands::RunningLspCommand;
     type ServerNames = std::collections::HashMap<lsp_client::LanguageServerId, String>;
 
-    fn running_command_rows(editor: &view::Editor) -> (Vec<RunningCommand>, ServerNames) {
-        let running = editor.running_lsp_commands();
-        let servers = running
+    /// A picker row. Cancelled rows stay listed because a server may ignore
+    /// `$/cancelRequest` (HLS does for `workspace/executeCommand`) and keep working.
+    #[derive(Clone)]
+    struct CommandRow {
+        command: RunningCommand,
+        cancelled: bool,
+    }
+
+    fn command_rows(
+        editor: &view::Editor,
+        cancelled: &[RunningCommand],
+    ) -> (Vec<CommandRow>, ServerNames) {
+        let live = editor
+            .running_lsp_commands()
+            .into_iter()
+            .filter(|command| cancelled.iter().all(|c| c.id != command.id))
+            .map(|command| CommandRow {
+                command,
+                cancelled: false,
+            });
+        let stopped = cancelled.iter().cloned().map(|command| CommandRow {
+            command,
+            cancelled: true,
+        });
+        let rows: Vec<_> = live.chain(stopped).collect();
+        let servers = rows
             .iter()
-            .map(|command| {
+            .map(|row| {
                 let name = editor
-                    .language_server_by_id(command.server_id)
+                    .language_server_by_id(row.command.server_id)
                     .map_or_else(String::new, |server| server.name().to_owned());
-                (command.server_id, name)
+                (row.command.server_id, name)
             })
             .collect();
-        (running, servers)
+        (rows, servers)
     }
 
     #[cold]
@@ -921,8 +944,7 @@ pub(super) mod typed {
         cx: &mut compositor::Context,
         _args: Args,
     ) -> anyhow::Result<()> {
-        let (running, servers) = running_command_rows(cx.editor);
-        if running.is_empty() {
+        if cx.editor.running_lsp_commands().is_empty() {
             cx.editor.set_status("No running language server commands");
             return Ok(());
         }
@@ -930,39 +952,67 @@ pub(super) mod typed {
             .sender()
             .enqueue(Callback::ui(move |compositor, cx| {
                 let editor = &mut *cx.editor;
+                let cancelled = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+                let (rows, servers) = command_rows(editor, &[]);
                 let columns = [
-                    ui::PickerColumn::new("title", |command: &RunningCommand, _| {
-                        command.title.as_str().into()
+                    ui::PickerColumn::new("title", |row: &CommandRow, _| {
+                        if row.cancelled {
+                            format!("{} (cancelling)", row.command.title).into()
+                        } else {
+                            row.command.title.as_str().into()
+                        }
                     }),
-                    ui::PickerColumn::new(
-                        "server",
-                        |command: &RunningCommand, servers: &ServerNames| {
-                            servers
-                                .get(&command.server_id)
-                                .cloned()
-                                .unwrap_or_default()
-                                .into()
-                        },
-                    ),
-                    ui::PickerColumn::new("running", |command: &RunningCommand, _| {
-                        format!("{}s", command.started.elapsed().as_secs()).into()
+                    ui::PickerColumn::new("server", |row: &CommandRow, servers: &ServerNames| {
+                        servers
+                            .get(&row.command.server_id)
+                            .cloned()
+                            .unwrap_or_default()
+                            .into()
+                    }),
+                    ui::PickerColumn::new("running", |row: &CommandRow, _| {
+                        format!("{}s", row.command.started.elapsed().as_secs()).into()
                     }),
                 ];
-                // Stay open after cancelling so several commands can be stopped in a row.
+                // Enter cancels. Enter on a cancelling row restarts its server, for when
+                // the server ignored the cancel. Stay open so several can be handled.
                 let picker = ui::Picker::new_with_callback_result(
                     editor.redraw().clone(),
                     columns,
                     0,
-                    running,
+                    rows,
                     servers,
-                    move |cx, command, _action| {
-                        if cx.editor.cancel_lsp_command(command.id) {
-                            cx.editor
-                                .set_status(format!("Cancelled \"{}\"", command.title));
+                    move |cx, row: &CommandRow, _action| {
+                        let command = &row.command;
+                        if row.cancelled {
+                            let name = cx
+                                .editor
+                                .language_server_by_id(command.server_id)
+                                .map(|server| server.name().to_owned());
+                            let document = doc!(cx.editor).id();
+                            match name {
+                                Some(name) => {
+                                    match cx.editor.restart_language_servers(document, &[&name]) {
+                                        Ok(()) => cx
+                                            .editor
+                                            .set_status(format!("Restarted language server {name}")),
+                                        Err(err) => cx.editor.set_error(|| err.to_string()),
+                                    }
+                                }
+                                None => cx.editor.set_status("Language server already stopped"),
+                            }
+                            cancelled
+                                .borrow_mut()
+                                .retain(|c: &RunningCommand| c.server_id != command.server_id);
+                        } else if cx.editor.cancel_lsp_command(command.id) {
+                            cx.editor.set_status(format!(
+                                "Cancelled \"{}\". If the server keeps running, press Enter again to restart it",
+                                command.title
+                            ));
+                            cancelled.borrow_mut().push(command.clone());
                         } else {
                             cx.editor.set_status("Command already finished");
                         }
-                        let (options, editor_data) = running_command_rows(cx.editor);
+                        let (options, editor_data) = command_rows(cx.editor, &cancelled.borrow());
                         if options.is_empty() {
                             return PickerCallbackResult::Close;
                         }
